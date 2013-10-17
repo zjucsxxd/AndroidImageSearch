@@ -12,6 +12,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
@@ -28,6 +29,13 @@ public class ImageSearch extends Activity {
 	Button btnSearch;
 	ArrayList<ImageResult> imageResults = new ArrayList<ImageResult>();
 	ImageResultArrayAdapter imageAdapter;
+	
+	String query;
+
+	String imgSz="";
+	String imgType="";
+	String imgColor="";
+	String siteFilter="";
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -45,6 +53,12 @@ public class ImageSearch extends Activity {
 				startActivity(i);
 			}
 		});
+		gvResults.setOnScrollListener(new EndlessScroll() {
+			@Override
+			public void onLoadMore(int page, int totalItemsCount) {
+				runImageSearch(page);
+			}
+		});
 	}
 
 	public void setupViews() {
@@ -53,12 +67,42 @@ public class ImageSearch extends Activity {
 		btnSearch = (Button) findViewById(R.id.btnSearch);
 	}
 	
+	public void onSettingsClick(MenuItem v) {
+		Intent i = new Intent(this, SettingsActivity.class);
+		i.putExtra("imgSz", imgSz);
+		i.putExtra("imgType", imgType);
+		i.putExtra("imgColor", imgColor);
+		i.putExtra("siteFilter", siteFilter);
+		startActivityForResult(i, 1337);
+	}
+	
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent i) {
+		imgSz = i.getExtras().getString("imgSz");
+		imgColor = i.getExtras().getString("imgColor");
+		imgType = i.getExtras().getString("imgType");
+		siteFilter = i.getExtras().getString("siteFilter");
+	} 
+	
 	public void onImageSearch(View v) {
-		String query = etQuery.getText().toString();
+		query = etQuery.getText().toString();
+		imageResults.clear();
+		runImageSearch(0);
+	}
+	
+	public void runImageSearch(int page) {
 		AsyncHttpClient client = new AsyncHttpClient();
 		final String googleImgSearchUrl =
 				"https://ajax.googleapis.com/ajax/services/search/images?" +
-				"rsz=8&start=0&v=1.0&q=" + Uri.encode(query);
+				"imgsz=" + imgSz +
+				"&imgtype=" + imgType +
+				"&imgcolor=" + imgColor +
+				"&as_sitesearch=" + siteFilter +
+				"&rsz=8" +
+				"&start=" + Integer.toString(page) +
+				"&v=1.0" +
+				"&q=" + Uri.encode(query);
+		Log.d("DEBUG", googleImgSearchUrl);
 		client.get(googleImgSearchUrl,
 				new JsonHttpResponseHandler() {
 			@Override
@@ -66,10 +110,8 @@ public class ImageSearch extends Activity {
 				JSONArray jsonImageResults = null;
 				try {
 					jsonImageResults = response.getJSONObject("responseData").getJSONArray("results");
-					imageResults.clear();
 					imageAdapter.addAll(
 							ImageResult.fromJsonArray(jsonImageResults));
-					Log.d("DEBUG", imageResults.toString());
 				} catch (JSONException e) {
 					e.printStackTrace();
 				}
